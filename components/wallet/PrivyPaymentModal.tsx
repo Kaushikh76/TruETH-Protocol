@@ -1,4 +1,4 @@
-// components/wallet/PrivyPaymentModal.tsx (Permanent Sui Address)
+// components/wallet/PrivyPaymentModal.tsx
 "use client"
 
 import React, { useState } from 'react'
@@ -17,7 +17,9 @@ import {
   Shield,
   Globe,
   ExternalLink,
-  Copy
+  Copy,
+  Database,
+  FileText
 } from 'lucide-react'
 
 // Permanent Sui destination address
@@ -54,8 +56,9 @@ export function PrivyPaymentModal({
   } = useWormholeCCTPBridge()
 
   const [isProcessing, setIsProcessing] = useState(false)
-  const [currentStep, setCurrentStep] = useState<'payment' | 'bridge' | 'complete'>('payment')
+  const [currentStep, setCurrentStep] = useState<'payment' | 'bridge' | 'storage' | 'complete'>('payment')
   const [txResults, setTxResults] = useState<any>(null)
+  const [walrusResults, setWalrusResults] = useState<any>(null)
 
   if (!isOpen) return null
 
@@ -79,51 +82,70 @@ export function PrivyPaymentModal({
       
       const bridgeResult = await bridgeUSDCToSui('1.0', signer, PERMANENT_SUI_ADDRESS)
 
-      if (bridgeResult.success) {
-        setTxResults(bridgeResult)
-        setCurrentStep('complete')
-
-        // Submit post data to backend
-        const response = await fetch('/api/posts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...postData,
-            bridgeTx: {
-              hash: bridgeResult.txHash,
-              amount: 1,
-              from: account,
-              suiRecipient: PERMANENT_SUI_ADDRESS,
-              wormholeSequence: bridgeResult.wormholeSequence,
-              timestamp: Date.now(),
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to submit post')
-        }
-
-        const result = await response.json()
-        
-        onSuccess({
-          success: true,
-          transactionHash: bridgeResult.txHash,
-          postId: result.data?.postId,
-          bridgeDetails: bridgeResult
-        })
-
-      } else {
+      if (!bridgeResult.success) {
         throw new Error(bridgeResult.error || 'Bridge failed')
       }
+
+      setTxResults(bridgeResult)
+
+      // Step 2: Store investigation data on Walrus
+      setCurrentStep('storage')
+      
+      const walrusResult = await storeOnWalrus({
+        ...postData,
+        bridgeTx: {
+          hash: bridgeResult.txHash,
+          amount: 1,
+          from: account,
+          suiRecipient: PERMANENT_SUI_ADDRESS,
+          wormholeSequence: bridgeResult.wormholeSequence,
+          timestamp: Date.now(),
+        },
+      })
+
+      if (!walrusResult.success) {
+        throw new Error('Failed to store data on Walrus')
+      }
+
+      setWalrusResults(walrusResult.data)
+      setCurrentStep('complete')
+
+      onSuccess({
+        success: true,
+        transactionHash: bridgeResult.txHash,
+        postId: walrusResult.data?.postId,
+        blobId: walrusResult.data?.blobId,
+        bridgeDetails: bridgeResult,
+        walrusDetails: walrusResult.data
+      })
 
     } catch (error: any) {
       console.error('Payment and bridge failed:', error)
       alert(`Transaction failed: ${error.message}`)
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const storeOnWalrus = async (investigationData: any) => {
+    try {
+      const response = await fetch('/api/walrus/store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(investigationData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to store on Walrus')
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Walrus storage error:', error)
+      throw error
     }
   }
 
@@ -174,21 +196,27 @@ export function PrivyPaymentModal({
         {/* Progress Steps */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
-            <div className={`flex items-center gap-2 ${currentStep === 'payment' ? 'text-blue-400' : currentStep === 'bridge' || currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'payment' ? 'border-blue-400 bg-blue-400/20' : currentStep === 'bridge' || currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
-                {currentStep === 'bridge' || currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '1'}
+            <div className={`flex items-center gap-2 ${currentStep === 'payment' ? 'text-blue-400' : currentStep === 'bridge' || currentStep === 'storage' || currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'payment' ? 'border-blue-400 bg-blue-400/20' : currentStep === 'bridge' || currentStep === 'storage' || currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
+                {currentStep === 'bridge' || currentStep === 'storage' || currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '1'}
               </div>
               <span className="text-xs font-medium">Setup</span>
             </div>
-            <div className={`flex items-center gap-2 ${currentStep === 'bridge' ? 'text-blue-400' : currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'bridge' ? 'border-blue-400 bg-blue-400/20' : currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
-                {currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '2'}
+            <div className={`flex items-center gap-2 ${currentStep === 'bridge' ? 'text-blue-400' : currentStep === 'storage' || currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'bridge' ? 'border-blue-400 bg-blue-400/20' : currentStep === 'storage' || currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
+                {currentStep === 'storage' || currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '2'}
               </div>
               <span className="text-xs font-medium">Bridge</span>
             </div>
+            <div className={`flex items-center gap-2 ${currentStep === 'storage' ? 'text-blue-400' : currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'storage' ? 'border-blue-400 bg-blue-400/20' : currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
+                {currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '3'}
+              </div>
+              <span className="text-xs font-medium">Store</span>
+            </div>
             <div className={`flex items-center gap-2 ${currentStep === 'complete' ? 'text-emerald-400' : 'text-gray-500'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${currentStep === 'complete' ? 'border-emerald-400 bg-emerald-400/20' : 'border-gray-500'}`}>
-                {currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '3'}
+                {currentStep === 'complete' ? <CheckCircle className="w-4 h-4" /> : '4'}
               </div>
               <span className="text-xs font-medium">Complete</span>
             </div>
@@ -222,82 +250,30 @@ export function PrivyPaymentModal({
           </div>
         </div>
 
-        {/* Sui Destination Address (Fixed) */}
-        {connected && (
-          <div className="mb-6">
-            <div className="p-4 bg-gray-900/50 rounded-lg border border-white/10">
-              <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                Sui Destination Address
-                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30">
-                  Fixed
-                </Badge>
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-gray-800 border border-white/10 rounded-lg">
-                  <span className="text-white text-sm font-mono flex-1 break-all">
-                    {PERMANENT_SUI_ADDRESS}
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(PERMANENT_SUI_ADDRESS)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => window.open(`https://suiexplorer.com/address/${PERMANENT_SUI_ADDRESS}?network=testnet`, '_blank')}
-                    size="sm"
-                    variant="outline"
-                    className="border-blue-400/50 text-blue-300 hover:text-blue-200 hover:border-blue-400/70"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    View on Sui Explorer
-                  </Button>
-                </div>
-                <p className="text-gray-500 text-xs">
-                  💡 All USDC will be sent to this secure TruETH Protocol address on Sui.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Payment Details */}
         <div className="mb-6 p-4 bg-gray-900/50 rounded-lg border border-white/10">
-          <h3 className="text-white font-semibold mb-3">Bridge Transaction Details</h3>
+          <h3 className="text-white font-semibold mb-3">Transaction Details</h3>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-400">Investigation Title:</span>
+              <span className="text-gray-400">Investigation:</span>
               <span className="text-white text-sm">{postData.title?.slice(0, 30)}...</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Amount:</span>
+              <span className="text-gray-400">Bridge Amount:</span>
               <span className="text-white font-semibold">1.00 USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Source Chain:</span>
-              <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
-                Arbitrum Sepolia
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Destination Chain:</span>
-              <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30">
-                Sui Testnet
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Bridge Protocol:</span>
+              <span className="text-gray-400">Bridge:</span>
               <Badge className="bg-orange-500/20 text-orange-300 border-orange-400/30">
-                Wormhole
+                Wormhole CCTP
               </Badge>
             </div>
-          </div>
-          <div className="mt-3 p-2 bg-purple-500/10 rounded border border-purple-400/20">
-            <p className="text-purple-300 text-xs">
-              💡 Simplified Wormhole bridge with fixed destination. USDC will be locked on Arbitrum and minted on Sui automatically.
-            </p>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Storage:</span>
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30">
+                Walrus Protocol
+              </Badge>
+            </div>
           </div>
         </div>
 
@@ -327,38 +303,53 @@ export function PrivyPaymentModal({
                 <CheckCircle className="w-4 h-4 text-blue-400" />
               )}
               <span className="text-blue-300 text-sm">
-                {bridgeStatus || 'Processing transaction...'}
+                {currentStep === 'bridge' && bridgeStatus ? bridgeStatus : 
+                 currentStep === 'storage' ? 'Storing investigation data on Walrus...' :
+                 'Processing transaction...'}
               </span>
             </div>
           </div>
         )}
 
         {/* Success Results */}
-        {currentStep === 'complete' && txResults && (
+        {currentStep === 'complete' && walrusResults && (
           <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-lg">
-            <h4 className="text-emerald-300 font-semibold mb-2">🎉 Bridge Successful!</h4>
-            <div className="space-y-2 text-sm">
+            <h4 className="text-emerald-300 font-semibold mb-3 flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              🎉 Investigation Stored Successfully!
+            </h4>
+            <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">Transaction:</span>
+                <span className="text-gray-400">Post ID:</span>
+                <span className="text-emerald-300 font-mono">{walrusResults.postId}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Walrus Blob ID:</span>
                 <button
-                  onClick={() => copyToClipboard(txResults.txHash)}
-                  className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1"
+                  onClick={() => copyToClipboard(walrusResults.blobId)}
+                  className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1 font-mono"
                 >
-                  {txResults.txHash?.slice(0, 10)}...
+                  {walrusResults.blobId?.slice(0, 20)}...
                   <Copy className="w-3 h-3" />
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">Wormhole Sequence:</span>
-                <span className="text-emerald-300 font-mono">{txResults.wormholeSequence}</span>
+              {txResults && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">Bridge TX:</span>
+                  <button
+                    onClick={() => copyToClipboard(txResults.txHash)}
+                    className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1 font-mono"
+                  >
+                    {txResults.txHash?.slice(0, 10)}...
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+              <div className="mt-3 p-2 bg-emerald-500/10 rounded border border-emerald-400/20">
+                <p className="text-emerald-400 text-xs">
+                  ✅ Your investigation is now permanently stored on Walrus and accessible via decentralized networks!
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">Destination:</span>
-                <span className="text-emerald-300 font-mono text-xs">{PERMANENT_SUI_ADDRESS.slice(0, 20)}...</span>
-              </div>
-              <p className="text-emerald-400 text-xs mt-2">
-                USDC will arrive on Sui automatically in ~15 minutes. Track on Wormhole Explorer.
-              </p>
             </div>
           </div>
         )}
@@ -374,7 +365,9 @@ export function PrivyPaymentModal({
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {currentStep === 'payment' ? 'Setting up...' : 'Bridging via Wormhole...'}
+                  {currentStep === 'payment' ? 'Setting up...' : 
+                   currentStep === 'bridge' ? 'Bridging via Wormhole...' :
+                   currentStep === 'storage' ? 'Storing on Walrus...' : 'Processing...'}
                 </>
               ) : !connected ? (
                 'Connect Wallet First'
@@ -383,7 +376,7 @@ export function PrivyPaymentModal({
               ) : (
                 <>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Bridge 1 USDC to Sui
+                  Bridge & Store Investigation
                 </>
               )}
             </Button>
@@ -395,7 +388,7 @@ export function PrivyPaymentModal({
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
-              Close & View Investigation
+              View Investigation
             </Button>
           )}
 
@@ -430,8 +423,9 @@ export function PrivyPaymentModal({
 
         {/* Help Text */}
         <div className="mt-4 p-3 bg-gray-900/30 rounded-lg border border-white/5">
-          <p className="text-xs text-gray-500">
-            🔗 Powered by Wormhole with secure fixed destination. All USDC goes to the TruETH Protocol treasury on Sui.
+          <p className="text-xs text-gray-500 flex items-center gap-2">
+            <FileText className="w-3 h-3" />
+            Powered by Wormhole Bridge + Walrus Storage for permanent, decentralized data availability.
           </p>
         </div>
       </div>
