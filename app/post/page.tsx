@@ -1,13 +1,16 @@
+// app/post/page.tsx
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Plus, X, Upload, File, ImageIcon, FileText } from "lucide-react"
+import { PrivyPaymentModal } from "@/components/wallet/PrivyPaymentModal"
+import { usePrivyWalletIntegration } from "@/hooks/usePrivyWalletIntegration"
+import { Plus, X, Upload, File, ImageIcon, FileText, Shield, CreditCard, AlertTriangle } from "lucide-react"
 
 interface UploadedFile {
   id: string
@@ -18,6 +21,9 @@ interface UploadedFile {
 }
 
 export default function PostPage() {
+  const router = useRouter()
+  const { connected, account, user } = usePrivyWalletIntegration()
+  
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [tags, setTags] = useState<string[]>([])
@@ -26,6 +32,8 @@ export default function PostPage() {
   const [rewardPool, setRewardPool] = useState(50)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const addTag = () => {
     if (currentTag.trim() && !tags.includes(currentTag.trim())) {
@@ -108,17 +116,60 @@ export default function PostPage() {
     return <File className="w-4 h-4" />
   }
 
+  const validateForm = () => {
+    if (!title.trim()) {
+      alert('Please enter a title')
+      return false
+    }
+    if (!content.trim()) {
+      alert('Please enter content')
+      return false
+    }
+    if (!connected) {
+      alert('Please connect with Privy first')
+      return false
+    }
+    return true
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log({
+    
+    if (!validateForm()) return
+
+    const postData = {
       title,
       content,
       tags,
       evidence: evidence.filter((e) => e.trim()),
-      rewardPool,
       files: uploadedFiles,
-    })
-    alert("Investigation submitted for verification!")
+      userWallet: account,
+      userId: user?.id,
+    }
+
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentSuccess = (result: any) => {
+    console.log('Payment successful:', result)
+    
+    // Show success message
+    alert(`Investigation submitted successfully! Transaction: ${result.transactionHash}`)
+    
+    // Redirect to the feed or post detail page
+    if (result.postId) {
+      router.push(`/investigation/${result.postId}`)
+    } else {
+      router.push('/')
+    }
+  }
+
+  const getUserDisplayName = () => {
+    if (!user) return 'Anonymous'
+    if (user.email) return user.email.address
+    if (user.google) return user.google.email
+    if (user.twitter) return `@${user.twitter.username}`
+    return 'Anonymous User'
   }
 
   return (
@@ -128,6 +179,29 @@ export default function PostPage() {
           Create Investigation
         </h1>
         <p className="text-gray-400 text-sm mb-6">Submit your findings for community verification</p>
+
+        {/* Authentication Status */}
+        {!connected ? (
+          <div className="mb-6 p-4 bg-purple-500/10 border border-purple-400/20 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-purple-400" />
+              <div>
+                <p className="text-purple-300 font-medium">Privy Authentication Required</p>
+                <p className="text-purple-400 text-sm">Connect with email, social login, or wallet to submit investigations</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-emerald-400" />
+              <div>
+                <p className="text-emerald-300 font-medium">Authenticated as {getUserDisplayName()}</p>
+                <p className="text-emerald-400 text-sm">Ready to submit investigations with secure payment</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-black border border-white/10 rounded-xl p-6 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -301,23 +375,102 @@ export default function PostPage() {
                 step="10"
                 className="bg-gray-900/50 border-white/10 text-white focus:border-white/20"
               />
-              <p className="text-sm text-gray-500 mt-1">This amount will be distributed among verifiers.</p>
+              <p className="text-sm text-gray-500 mt-1">
+                This amount will be distributed among verifiers. Payment via Privy embedded wallet on Arbitrum.
+              </p>
             </div>
+
+            {/* Payment Preview */}
+            <div className="p-4 bg-gray-900/50 rounded-lg border border-white/10">
+              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Payment Summary
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reward Pool:</span>
+                  <span className="text-white font-medium">{rewardPool} USDC</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Network:</span>
+                  <span className="text-blue-300">Arbitrum One</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Payment Method:</span>
+                  <span className="text-purple-300">Privy Embedded Wallet</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">User:</span>
+                  <span className="text-white">{getUserDisplayName()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Security Notice */}
+            {connected && (
+              <div className="p-3 bg-purple-500/10 border border-purple-400/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Shield className="w-4 h-4 text-purple-400 mt-0.5" />
+                  <div>
+                    <p className="text-purple-300 text-sm font-medium">Secure Payment with Privy</p>
+                    <p className="text-purple-400 text-xs mt-1">
+                      Your embedded wallet is secured with TEE technology and distributed key sharding. 
+                      Only you can authorize transactions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-4">
               <Button
                 type="button"
                 variant="outline"
                 className="flex-1 border-white/20 text-gray-400 hover:text-white hover:border-white/30 bg-transparent hover:bg-white/10"
+                onClick={() => {
+                  // Save as draft functionality
+                  localStorage.setItem('investigation_draft', JSON.stringify({
+                    title, content, tags, evidence, rewardPool, files: uploadedFiles
+                  }))
+                  alert('Draft saved locally!')
+                }}
               >
                 Save Draft
               </Button>
-              <Button type="submit" className="flex-1 bg-white/20 text-white hover:bg-white/30 border border-white/20">
-                Submit Investigation
+              <Button 
+                type="submit" 
+                className="flex-1 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/20"
+                disabled={isSubmitting || !connected}
+              >
+                {connected ? (
+                  <>
+                    <Shield className="w-4 h-4 mr-2" />
+                    Submit & Pay with Privy
+                  </>
+                ) : (
+                  'Connect Privy First'
+                )}
               </Button>
             </div>
           </form>
         </div>
+
+        {/* Privy Payment Modal */}
+        <PrivyPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          rewardPool={rewardPool}
+          postData={{
+            title,
+            content,
+            tags,
+            evidence: evidence.filter((e) => e.trim()),
+            files: uploadedFiles,
+            userWallet: account,
+            userId: user?.id,
+          }}
+          onSuccess={handlePaymentSuccess}
+        />
       </div>
     </div>
   )
