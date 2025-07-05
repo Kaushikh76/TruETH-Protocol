@@ -3,7 +3,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Plus, Search, User, Wallet, ExternalLink, Shield, LogOut, Mail, Globe, ChevronDown } from "lucide-react"
+import { Home, Plus, Search, User, Shield, LogOut, Mail, Globe, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePrivyWalletIntegration } from "../hooks/usePrivyWalletIntegration"
 import { useState } from "react"
@@ -18,14 +18,10 @@ export function Navigation() {
     connecting, 
     account, 
     user,
-    balance, 
-    chainId, 
-    isArbitrumSepolia,
-    primaryWallet,
+    usdcBalance, 
+    chainId,
     connectWallet,
     logout,
-    switchToArbitrumSepolia,
-    bridgeToSui 
   } = usePrivyWalletIntegration()
 
   const navItems = [
@@ -37,60 +33,6 @@ export function Navigation() {
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  const getNetworkName = (chainId: string) => {
-    switch (chainId) {
-      case '421614': return 'Arbitrum Sepolia'
-      case '11155111': return 'Ethereum Sepolia'
-      case '84532': return 'Base Sepolia'
-      case '80001': return 'Polygon Mumbai'
-      case '42161': return 'Arbitrum One'
-      case '1': return 'Ethereum'
-      case '8453': return 'Base'
-      case '137': return 'Polygon'
-      case '10': return 'Optimism'
-      case '56': return 'BSC'
-      default: return 'Unknown'
-    }
-  }
-
-  const getWalletTypeIcon = () => {
-    if (!primaryWallet) return <Wallet className="w-3 h-3" />
-    
-    switch (primaryWallet.walletClientType) {
-      case 'privy':
-        return <Shield className="w-3 h-3 text-purple-400" />
-      case 'metamask':
-        return <Wallet className="w-3 h-3 text-orange-400" />
-      case 'coinbase_wallet':
-        return <Wallet className="w-3 h-3 text-blue-400" />
-      case 'wallet_connect':
-        return <Globe className="w-3 h-3 text-blue-400" />
-      case 'rainbow':
-        return <Wallet className="w-3 h-3 text-rainbow-400" />
-      default:
-        return <Wallet className="w-3 h-3 text-gray-400" />
-    }
-  }
-
-  const getWalletTypeName = () => {
-    if (!primaryWallet) return 'No Wallet'
-    
-    switch (primaryWallet.walletClientType) {
-      case 'privy':
-        return 'Privy Embedded'
-      case 'metamask':
-        return 'MetaMask'
-      case 'coinbase_wallet':
-        return 'Coinbase Wallet'
-      case 'wallet_connect':
-        return 'WalletConnect'
-      case 'rainbow':
-        return 'Rainbow'
-      default:
-        return primaryWallet.walletClientType || 'External Wallet'
-    }
   }
 
   const getUserLoginMethod = () => {
@@ -144,7 +86,7 @@ export function Navigation() {
             </Link>
             <div className="flex items-center gap-2 text-gray-400 text-sm">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-              <span>Loading Privy...</span>
+              <span>Loading...</span>
             </div>
           </div>
         </div>
@@ -199,12 +141,24 @@ export function Navigation() {
                 className="bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/20 rounded-full px-4 py-2 transition-all duration-200"
               >
                 <Shield className="w-3 h-3 mr-2" />
-                {connecting ? 'Connecting...' : 'Connect Privy'}
+                {connecting ? 'Connecting...' : 'Connect'}
               </Button>
             ) : (
               <>
-                {/* User Authentication Info */}
-                {loginMethod && (
+                {/* Wallet Info - Compact Display */}
+                <div className="flex items-center gap-3">
+                  {/* USDC Balance */}
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 rounded-full backdrop-blur-sm border border-emerald-400/20">
+                    <span className="text-xs font-medium text-white">{usdcBalance}</span>
+                    <span className="text-xs text-emerald-400">USDC</span>
+                  </div>
+
+                  {/* Chain Indicator */}
+                  <div className="px-2 py-1 rounded-full text-xs border bg-blue-500/20 text-blue-300 border-blue-400/30">
+                    Arbitrum Sepolia
+                  </div>
+
+                  {/* User Menu Button */}
                   <div className="relative">
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
@@ -212,9 +166,8 @@ export function Navigation() {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <loginMethod.icon className="w-3 h-3 text-gray-300" />
-                        <span className="text-xs font-medium text-white">
-                          {loginMethod.display}
+                        <span className="text-xs font-medium text-white font-mono">
+                          {formatAddress(account)}
                         </span>
                         <ChevronDown className="w-3 h-3 text-gray-400" />
                       </div>
@@ -226,10 +179,19 @@ export function Navigation() {
                         <div className="space-y-2">
                           <div className="px-3 py-2 border-b border-white/10">
                             <p className="text-xs text-gray-400">Signed in as</p>
-                            <p className="text-sm font-medium text-white">{loginMethod.value}</p>
-                            <p className="text-xs text-purple-400">via {loginMethod.type}</p>
+                            {loginMethod && (
+                              <>
+                                <p className="text-sm font-medium text-white">{loginMethod.display}</p>
+                                <p className="text-xs text-purple-400">via {loginMethod.type}</p>
+                              </>
+                            )}
                           </div>
                           
+                          <div className="px-3 py-1">
+                            <p className="text-xs text-gray-400">Wallet Address</p>
+                            <p className="text-xs font-mono text-gray-300">{formatAddress(account)}</p>
+                          </div>
+
                           {user?.id && (
                             <div className="px-3 py-1">
                               <p className="text-xs text-gray-400">User ID</p>
@@ -251,67 +213,6 @@ export function Navigation() {
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* Wallet Info */}
-                {account && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 rounded-full backdrop-blur-sm border border-white/10">
-                    <div className="flex items-center gap-2">
-                      {getWalletTypeIcon()}
-                      <span className="text-xs font-medium text-white font-mono">
-                        {formatAddress(account)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Network Indicator */}
-                {chainId && (
-                  <div className={`px-2 py-1 rounded-full text-xs border transition-all duration-200 ${
-                    isArbitrumSepolia 
-                      ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' 
-                      : 'bg-amber-500/20 text-amber-300 border-amber-400/30 animate-pulse'
-                  }`}>
-                    {getNetworkName(chainId)}
-                  </div>
-                )}
-
-                {/* Balance Display */}
-                {balance && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/15 rounded-full backdrop-blur-sm border border-emerald-400/20">
-                    <span className="text-xs font-medium text-white">{balance}</span>
-                    <span className="text-xs text-emerald-400">ETH</span>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1">
-                  {/* Network Switch Button */}
-                  {!isArbitrumSepolia && chainId && (
-                    <Button
-                      onClick={switchToArbitrumSepolia}
-                      size="sm"
-                      className="bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-400/20 rounded-full px-3 py-1 text-xs transition-all duration-200"
-                    >
-                      Switch to Arbitrum Sepolia
-                    </Button>
-                  )}
-
-                  {/* Sui Bridge Button */}
-                  <Button
-                    onClick={() => bridgeToSui(0.01)}
-                    size="sm"
-                    className="bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/20 rounded-full px-3 py-1 transition-all duration-200"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    <span className="text-xs">Bridge to Sui</span>
-                  </Button>
-                </div>
-
-                {/* Wallet Type Indicator */}
-                <div className="flex items-center gap-1 px-2 py-1 bg-gray-900/30 rounded-full border border-white/5">
-                  {getWalletTypeIcon()}
-                  <span className="text-xs text-gray-400">{getWalletTypeName()}</span>
                 </div>
               </>
             )}

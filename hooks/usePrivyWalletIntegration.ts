@@ -1,13 +1,7 @@
 // hooks/usePrivyWalletIntegration.ts
 import { useState, useEffect, useCallback } from 'react'
-import { usePrivy, useWallets, useSendTransaction } from '@privy-io/react-auth'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { ethers } from 'ethers'
-
-interface TransactionResult {
-  hash: string
-  blockNumber?: number
-  status: 'pending' | 'confirmed' | 'failed'
-}
 
 interface PaymentConfirmation {
   success: boolean
@@ -27,9 +21,9 @@ export function usePrivyWalletIntegration() {
   } = usePrivy()
   
   const { wallets } = useWallets()
-  const { sendTransaction } = useSendTransaction()
   
-  const [balance, setBalance] = useState<string>('0')
+  const [ethBalance, setEthBalance] = useState<string>('0')
+  const [usdcBalance, setUsdcBalance] = useState<string>('0')
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<string>('')
 
@@ -39,9 +33,9 @@ export function usePrivyWalletIntegration() {
     wallet.connectorType === 'injected'
   ) || wallets[0]
 
-  // Check if we're on Arbitrum (chain ID 42161 for mainnet, 421614 for sepolia)
+  // Chain ID - should always be Arbitrum Sepolia (421614)
   const currentChainId = primaryWallet?.chainId?.split(':')[1] // Remove 'eip155:' prefix
-  const isArbitrum = currentChainId === '42161' || currentChainId === '421614'
+  const isArbitrumSepolia = currentChainId === '421614'
 
   const connectWallet = useCallback(async () => {
     try {
@@ -58,19 +52,19 @@ export function usePrivyWalletIntegration() {
     }
   }, [login, createWallet, authenticated, wallets.length])
 
-  const switchToArbitrum = useCallback(async () => {
-    if (!primaryWallet) return
+  const switchToArbitrumSepolia = useCallback(async () => {
+    if (!primaryWallet || isArbitrumSepolia) return
 
     try {
-      // Switch to Arbitrum One (chain ID 42161)
-      await primaryWallet.switchChain(42161)
+      // Switch to Arbitrum Sepolia (chain ID 421614)
+      await primaryWallet.switchChain(421614)
     } catch (switchError: any) {
-      console.error('Failed to switch to Arbitrum:', switchError)
+      console.error('Failed to switch to Arbitrum Sepolia:', switchError)
       throw switchError
     }
-  }, [primaryWallet])
+  }, [primaryWallet, isArbitrumSepolia])
 
-  const getBalance = useCallback(async (address: string) => {
+  const getBalances = useCallback(async (address: string) => {
     if (!primaryWallet) return
 
     try {
@@ -78,25 +72,41 @@ export function usePrivyWalletIntegration() {
       const provider = await primaryWallet.getEthereumProvider()
       const ethersProvider = new ethers.BrowserProvider(provider)
       
-      const balance = await ethersProvider.getBalance(address)
-      const balanceInEth = ethers.formatEther(balance)
-      setBalance(parseFloat(balanceInEth).toFixed(4))
+      // Get ETH balance
+      const ethBal = await ethersProvider.getBalance(address)
+      const ethBalanceInEth = ethers.formatEther(ethBal)
+      setEthBalance(parseFloat(ethBalanceInEth).toFixed(4))
+
+      // Get USDC balance (testnet USDC contract address for Arbitrum Sepolia)
+      const USDC_CONTRACT = '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d'
+      const usdcInterface = new ethers.Interface([
+        'function balanceOf(address owner) view returns (uint256)',
+        'function decimals() view returns (uint8)'
+      ])
+      
+      const usdcContract = new ethers.Contract(USDC_CONTRACT, usdcInterface, ethersProvider)
+      const usdcBal = await usdcContract.balanceOf(address)
+      const usdcBalanceInUsdc = ethers.formatUnits(usdcBal, 6) // USDC has 6 decimals
+      setUsdcBalance(parseFloat(usdcBalanceInUsdc).toFixed(2))
+      
     } catch (error) {
-      console.error('Failed to get balance:', error)
+      console.error('Failed to get balances:', error)
+      // Set default values on error
+      setEthBalance('0')
+      setUsdcBalance('0')
     }
   }, [primaryWallet])
 
-  // Process payment for posting (USDC payment on Arbitrum)
+  // Process payment for posting (1 USDC payment on Arbitrum Sepolia)
   const processPayment = useCallback(async (
-    rewardPool: number,
     postData: any
   ): Promise<PaymentConfirmation> => {
     if (!primaryWallet || !authenticated) {
       throw new Error('Wallet not connected')
     }
 
-    if (!isArbitrum) {
-      await switchToArbitrum()
+    if (!isArbitrumSepolia) {
+      await switchToArbitrumSepolia()
       // Wait for chain switch to complete
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
@@ -105,12 +115,14 @@ export function usePrivyWalletIntegration() {
     setPaymentStatus('Initiating payment...')
 
     try {
-      // USDC contract address on Arbitrum One
-      const USDC_CONTRACT = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
-      const SERVER_WALLET = process.env.NEXT_PUBLIC_SERVER_WALLET || '0x742d35Cc6634C0532925a3b8D45D9652B395e906'
+      // USDC contract address on Arbitrum Sepolia (testnet)
+      const USDC_CONTRACT = '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d'
+      // Use a proper Ethereum address format that you control
+      // You can bridge from this address to Sui later using Sui Bridge or other cross-chain bridges
+      const COLLECTION_WALLET = '0x742d35cc6634c0532925a3b8d45d9652b395e906'
       
-      // Convert USDC amount to proper decimals (USDC has 6 decimals)
-      const usdcAmount = ethers.parseUnits(rewardPool.toString(), 6)
+      // Convert 1 USDC to proper decimals (USDC has 6 decimals)
+      const usdcAmount = ethers.parseUnits('1', 6) // Fixed 1 USDC per post
 
       setPaymentStatus('Requesting transaction approval...')
 
@@ -120,16 +132,24 @@ export function usePrivyWalletIntegration() {
       ])
       
       const transferData = transferInterface.encodeFunctionData('transfer', [
-        SERVER_WALLET,
+        COLLECTION_WALLET,
         usdcAmount
       ])
 
-      // Send transaction using Privy's sendTransaction
-      const txResult = await sendTransaction({
+      // Send transaction using the wallet provider directly
+      const provider = await primaryWallet.getEthereumProvider()
+      const ethersProvider = new ethers.BrowserProvider(provider)
+      const signer = await ethersProvider.getSigner()
+
+      // Create the transaction object
+      const transaction = {
         to: USDC_CONTRACT,
         data: transferData,
-        value: '0', // No ETH value for ERC-20 transfer
-      })
+        value: '0x0', // No ETH value for ERC-20 transfer
+      }
+
+      // Send transaction using ethers signer
+      const txResult = await signer.sendTransaction(transaction)
 
       setPaymentStatus('Transaction sent. Confirming payment...')
 
@@ -143,8 +163,9 @@ export function usePrivyWalletIntegration() {
           ...postData,
           paymentTx: {
             hash: txResult.transactionHash,
-            amount: rewardPool,
+            amount: 1, // Fixed 1 USDC
             from: primaryWallet.address,
+            to: COLLECTION_WALLET,
             timestamp: Date.now(),
           },
         }),
@@ -156,11 +177,18 @@ export function usePrivyWalletIntegration() {
 
       const result = await response.json()
       
-      setPaymentStatus('Payment confirmed!')
+      setPaymentStatus('Payment confirmed! USDC will be bridged to Sui.')
+      
+      // Refresh balances after successful payment
+      setTimeout(() => {
+        if (primaryWallet?.address) {
+          getBalances(primaryWallet.address)
+        }
+      }, 2000)
       
       return {
         success: true,
-        transactionHash: txResult.transactionHash,
+        transactionHash: txResult.hash,
         postId: result.data?.postId,
       }
 
@@ -176,19 +204,19 @@ export function usePrivyWalletIntegration() {
       setIsProcessingPayment(false)
       setTimeout(() => setPaymentStatus(''), 3000)
     }
-  }, [primaryWallet, authenticated, isArbitrum, switchToArbitrum, sendTransaction])
+  }, [primaryWallet, authenticated, isArbitrumSepolia, switchToArbitrumSepolia, getBalances])
 
-  // Bridge to Sui functionality
+  // Bridge to Sui functionality (simplified)
   const bridgeToSui = useCallback(async (amount: number) => {
     if (!primaryWallet || !authenticated) {
       throw new Error('Wallet not connected')
     }
 
     try {
-      setPaymentStatus('Initiating bridge to Sui...')
+      setPaymentStatus('Opening Sui Bridge...')
       
       // Open Sui Bridge in new window
-      const bridgeUrl = `https://bridge.sui.io/?from=ethereum&to=sui&token=ETH&amount=${amount}`
+      const bridgeUrl = `https://bridge.sui.io/?from=arbitrum&to=sui&token=ETH&amount=${amount}`
       window.open(bridgeUrl, '_blank', 'width=800,height=600')
       
       setPaymentStatus('Bridge window opened. Complete the bridge transaction.')
@@ -219,10 +247,17 @@ export function usePrivyWalletIntegration() {
   }, [primaryWallet, authenticated])
 
   useEffect(() => {
-    if (authenticated && primaryWallet?.address) {
-      getBalance(primaryWallet.address)
+    if (authenticated && primaryWallet?.address && isArbitrumSepolia) {
+      getBalances(primaryWallet.address)
+      
+      // Refresh balances every 30 seconds
+      const interval = setInterval(() => {
+        getBalances(primaryWallet.address)
+      }, 30000)
+      
+      return () => clearInterval(interval)
     }
-  }, [authenticated, primaryWallet?.address, currentChainId, getBalance])
+  }, [authenticated, primaryWallet?.address, isArbitrumSepolia, getBalances])
 
   return {
     // Connection state
@@ -231,16 +266,18 @@ export function usePrivyWalletIntegration() {
     connecting: !ready,
     account: primaryWallet?.address,
     user,
-    balance,
+    balance: ethBalance, // Keep for backward compatibility
+    ethBalance,
+    usdcBalance,
     chainId: currentChainId,
-    isArbitrum,
+    isArbitrumSepolia,
     wallets,
     primaryWallet,
     
     // Actions
     connectWallet,
     logout,
-    switchToArbitrum,
+    switchToArbitrumSepolia,
     processPayment,
     bridgeToSui,
     signMessage,

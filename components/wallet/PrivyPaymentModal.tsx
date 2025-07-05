@@ -6,23 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { usePrivyWalletIntegration } from '@/hooks/usePrivyWalletIntegration'
 import { 
-  Wallet, 
   CreditCard, 
-  ExternalLink, 
   CheckCircle, 
   XCircle, 
   Loader2,
   AlertTriangle,
-  ArrowRight,
   Mail,
   Shield,
-  Globe
+  Globe,
+  ArrowRight
 } from 'lucide-react'
 
 interface PrivyPaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  rewardPool: number
   postData: any
   onSuccess: (result: any) => void
 }
@@ -30,7 +27,6 @@ interface PrivyPaymentModalProps {
 export function PrivyPaymentModal({ 
   isOpen, 
   onClose, 
-  rewardPool, 
   postData, 
   onSuccess 
 }: PrivyPaymentModalProps) {
@@ -39,13 +35,9 @@ export function PrivyPaymentModal({
     connected,
     account,
     user,
-    balance,
-    chainId,
+    usdcBalance,
     isArbitrumSepolia,
-    primaryWallet,
     connectWallet,
-    logout,
-    switchToArbitrumSepolia,
     processPayment,
     bridgeToSui,
     isProcessingPayment,
@@ -58,7 +50,7 @@ export function PrivyPaymentModal({
 
   const handlePayment = async () => {
     try {
-      const result = await processPayment(rewardPool, postData)
+      const result = await processPayment(postData)
       if (result.success) {
         onSuccess(result)
         onClose()
@@ -70,36 +62,6 @@ export function PrivyPaymentModal({
 
   const handleBridge = async () => {
     await bridgeToSui(0.01) // Bridge a small amount to Sui for gas
-  }
-
-  const getWalletTypeIcon = () => {
-    if (!primaryWallet) return <Wallet className="w-5 h-5 text-blue-400" />
-    
-    switch (primaryWallet.walletClientType) {
-      case 'privy':
-        return <Shield className="w-5 h-5 text-purple-400" />
-      case 'metamask':
-        return <Wallet className="w-5 h-5 text-orange-400" />
-      default:
-        return <Globe className="w-5 h-5 text-blue-400" />
-    }
-  }
-
-  const getWalletTypeName = () => {
-    if (!primaryWallet) return 'No Wallet'
-    
-    switch (primaryWallet.walletClientType) {
-      case 'privy':
-        return 'Privy Embedded Wallet'
-      case 'metamask':
-        return 'MetaMask'
-      case 'coinbase_wallet':
-        return 'Coinbase Wallet'
-      case 'wallet_connect':
-        return 'WalletConnect'
-      default:
-        return primaryWallet.walletClientType || 'External Wallet'
-    }
   }
 
   const getUserLoginMethod = () => {
@@ -127,11 +89,13 @@ export function PrivyPaymentModal({
     )
   }
 
+  const canPayment = connected && isArbitrumSepolia && parseFloat(usdcBalance) >= 1
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-black border border-white/20 rounded-xl max-w-md w-full p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Payment Confirmation</h2>
+          <h2 className="text-xl font-bold text-white">Post Investigation</h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
@@ -167,28 +131,6 @@ export function PrivyPaymentModal({
           </div>
         </div>
 
-        {/* Wallet Connection Status */}
-        {connected && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-white/10">
-              <div className="flex items-center gap-3">
-                {getWalletTypeIcon()}
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    {getWalletTypeName()}
-                  </p>
-                  {account && (
-                    <p className="text-gray-400 text-xs font-mono">
-                      {account.slice(0, 6)}...{account.slice(-4)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-            </div>
-          </div>
-        )}
-
         {/* Network Status */}
         {connected && (
           <div className="mb-6">
@@ -198,47 +140,44 @@ export function PrivyPaymentModal({
                   <div className="w-2 h-2 rounded-full bg-white" />
                 </div>
                 <div>
-                  <p className="text-white text-sm font-medium">
-                    {isArbitrumSepolia ? 'Arbitrum Sepolia' : 'Switch to Arbitrum Sepolia'}
-                  </p>
-                  <p className="text-gray-400 text-xs">
-                    {isArbitrumSepolia ? 'Ready for testnet USDC payment' : 'Required for testnet payment'}
-                  </p>
+                  <p className="text-white text-sm font-medium">Arbitrum Sepolia</p>
+                  <p className="text-gray-400 text-xs">Testnet network</p>
                 </div>
               </div>
-              {isArbitrumSepolia ? (
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-              ) : (
-                <Button onClick={switchToArbitrumSepolia} size="sm" className="bg-orange-500 hover:bg-orange-600">
-                  Switch
-                </Button>
-              )}
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
         )}
 
         {/* Payment Details */}
         <div className="mb-6 p-4 bg-gray-900/50 rounded-lg border border-white/10">
-          <h3 className="text-white font-semibold mb-3">Payment Details</h3>
+          <h3 className="text-white font-semibold mb-3">Post Investigation</h3>
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-400">Investigation Title:</span>
               <span className="text-white text-sm">{postData.title?.slice(0, 30)}...</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Reward Pool:</span>
-              <span className="text-white font-semibold">{rewardPool} USDC</span>
+              <span className="text-gray-400">Posting Fee:</span>
+              <span className="text-white font-semibold">1.00 USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Network:</span>
+              <span className="text-gray-400">Source Network:</span>
               <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
-                Arbitrum Sepolia (Testnet)
+                Arbitrum Sepolia
               </Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Wallet Type:</span>
-              <span className="text-purple-300 text-sm">{getWalletTypeName()}</span>
+              <span className="text-gray-400">Final Destination:</span>
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30">
+                Sui Network
+              </Badge>
             </div>
+          </div>
+          <div className="mt-3 p-2 bg-purple-500/10 rounded border border-purple-400/20">
+            <p className="text-purple-300 text-xs">
+              💡 Your USDC will be collected on Arbitrum and automatically bridged to Sui via Portal Bridge (Wormhole).
+            </p>
           </div>
         </div>
 
@@ -246,13 +185,13 @@ export function PrivyPaymentModal({
         {connected && (
           <div className="mb-6 p-3 bg-gray-900/30 rounded-lg border border-white/5">
             <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm">Your Balance:</span>
-              <span className="text-white text-sm font-medium">{balance} ETH</span>
+              <span className="text-gray-400 text-sm">Your USDC Balance:</span>
+              <span className="text-white text-sm font-medium">{usdcBalance} USDC</span>
             </div>
-            {parseFloat(balance) < 0.001 && (
+            {parseFloat(usdcBalance) < 1 && (
               <div className="mt-2 flex items-center gap-2 text-amber-400 text-xs">
                 <AlertTriangle className="w-3 h-3" />
-                <span>Low balance. Consider bridging more ETH.</span>
+                <span>Insufficient USDC balance. You need at least 1 USDC to post.</span>
               </div>
             )}
           </div>
@@ -276,21 +215,42 @@ export function PrivyPaymentModal({
         <div className="space-y-3">
           <Button
             onClick={handlePayment}
-            disabled={!connected || !isArbitrumSepolia || isProcessingPayment}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={!canPayment || isProcessingPayment}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white disabled:bg-gray-600 disabled:text-gray-400"
           >
             {isProcessingPayment ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Processing Payment...
               </>
+            ) : !connected ? (
+              'Connect Wallet First'
+            ) : parseFloat(usdcBalance) < 1 ? (
+              'Insufficient USDC Balance'
             ) : (
               <>
                 <CreditCard className="w-4 h-4 mr-2" />
-                Pay {rewardPool} USDC
+                Pay 1 USDC to Post
               </>
             )}
           </Button>
+
+          {parseFloat(usdcBalance) < 1 && connected && (
+            <div className="p-3 bg-amber-500/10 border border-amber-400/20 rounded-lg">
+              <p className="text-amber-300 text-sm font-medium mb-2">Need USDC?</p>
+              <p className="text-amber-400 text-xs mb-3">
+                You can get testnet USDC from faucets or bridge from other testnets.
+              </p>
+              <Button
+                onClick={() => window.open('https://faucet.circle.com/', '_blank')}
+                variant="outline"
+                size="sm"
+                className="w-full border-amber-400/50 text-amber-300 hover:text-amber-200 hover:border-amber-400/70"
+              >
+                Get Testnet USDC
+              </Button>
+            </div>
+          )}
 
           {!showBridgeOption ? (
             <Button
@@ -328,7 +288,7 @@ export function PrivyPaymentModal({
         {/* Help Text */}
         <div className="mt-4 p-3 bg-gray-900/30 rounded-lg border border-white/5">
           <p className="text-xs text-gray-500">
-            💡 Powered by Privy's secure embedded wallets. Your payment secures the investigation reward pool.
+            🔒 Powered by Privy's secure embedded wallets. The 1 USDC fee covers blockchain posting costs and platform maintenance.
           </p>
         </div>
       </div>

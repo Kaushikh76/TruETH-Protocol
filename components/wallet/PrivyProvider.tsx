@@ -29,7 +29,7 @@ export function PrivyWalletProvider({ children }: PrivyWalletProviderProps) {
       rainbow: {},
     },
     
-    // Default chain configuration (Arbitrum Sepolia - Testnet)
+    // Default chain configuration (Arbitrum Sepolia - Testnet ONLY)
     defaultChain: {
       id: 421614, // Arbitrum Sepolia
       name: 'Arbitrum Sepolia',
@@ -55,29 +55,8 @@ export function PrivyWalletProvider({ children }: PrivyWalletProviderProps) {
       },
     },
     
-    // Additional supported chains (testnets for development)
+    // Only support Arbitrum Sepolia to keep it simple
     supportedChains: [
-      {
-        id: 11155111, // Ethereum Sepolia
-        name: 'Ethereum Sepolia',
-        network: 'sepolia',
-        nativeCurrency: {
-          name: 'Ethereum',
-          symbol: 'ETH',
-          decimals: 18,
-        },
-        rpcUrls: {
-          default: {
-            http: ['https://sepolia.infura.io/v3/' + (process.env.NEXT_PUBLIC_INFURA_API_KEY || '')],
-          },
-        },
-        blockExplorers: {
-          default: {
-            name: 'Etherscan Sepolia',
-            url: 'https://sepolia.etherscan.io',
-          },
-        },
-      },
       {
         id: 421614, // Arbitrum Sepolia
         name: 'Arbitrum Sepolia',
@@ -96,27 +75,6 @@ export function PrivyWalletProvider({ children }: PrivyWalletProviderProps) {
           default: {
             name: 'Arbiscan Sepolia',
             url: 'https://sepolia.arbiscan.io',
-          },
-        },
-      },
-      {
-        id: 84532, // Base Sepolia
-        name: 'Base Sepolia',
-        network: 'base-sepolia',
-        nativeCurrency: {
-          name: 'Ethereum',
-          symbol: 'ETH',
-          decimals: 18,
-        },
-        rpcUrls: {
-          default: {
-            http: ['https://sepolia.base.org'],
-          },
-        },
-        blockExplorers: {
-          default: {
-            name: 'BaseScan Sepolia',
-            url: 'https://sepolia.basescan.org',
           },
         },
       },

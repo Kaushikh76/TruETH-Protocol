@@ -22,14 +22,13 @@ interface UploadedFile {
 
 export default function PostPage() {
   const router = useRouter()
-  const { connected, account, user } = usePrivyWalletIntegration()
+  const { connected, account, user, usdcBalance } = usePrivyWalletIntegration()
   
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [currentTag, setCurrentTag] = useState("")
   const [evidence, setEvidence] = useState<string[]>([""])
-  const [rewardPool, setRewardPool] = useState(50)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -172,6 +171,8 @@ export default function PostPage() {
     return 'Anonymous User'
   }
 
+  const hasInsufficientBalance = parseFloat(usdcBalance) < 1
+
   return (
     <div className="min-h-screen bg-black">
       <div className="max-w-lg mx-auto px-4 py-6">
@@ -198,6 +199,28 @@ export default function PostPage() {
               <div>
                 <p className="text-emerald-300 font-medium">Authenticated as {getUserDisplayName()}</p>
                 <p className="text-emerald-400 text-sm">Ready to submit investigations with secure payment</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Balance Warning */}
+        {connected && hasInsufficientBalance && (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-400/20 rounded-xl">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <div>
+                <p className="text-amber-300 font-medium">Insufficient USDC Balance</p>
+                <p className="text-amber-400 text-sm">
+                  You have {usdcBalance} USDC. You need at least 1 USDC to post an investigation.
+                </p>
+                <Button
+                  onClick={() => window.open('https://faucet.circle.com/', '_blank')}
+                  size="sm"
+                  className="mt-2 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/20"
+                >
+                  Get Testnet USDC
+                </Button>
               </div>
             </div>
           </div>
@@ -361,47 +384,28 @@ export default function PostPage() {
               )}
             </div>
 
-            <div>
-              <label htmlFor="reward" className="block text-sm font-medium text-white mb-2">
-                Reward Pool (USDC)
-              </label>
-              <Input
-                id="reward"
-                type="number"
-                value={rewardPool}
-                onChange={(e) => setRewardPool(Number(e.target.value))}
-                min="10"
-                max="1000"
-                step="10"
-                className="bg-gray-900/50 border-white/10 text-white focus:border-white/20"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                This amount will be distributed among verifiers. Payment via Privy embedded wallet on Arbitrum.
-              </p>
-            </div>
-
             {/* Payment Preview */}
             <div className="p-4 bg-gray-900/50 rounded-lg border border-white/10">
               <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
                 <CreditCard className="w-4 h-4" />
-                Payment Summary
+                Posting Fee
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Reward Pool:</span>
-                  <span className="text-white font-medium">{rewardPool} USDC</span>
+                  <span className="text-gray-400">Investigation Posting:</span>
+                  <span className="text-white font-medium">1.00 USDC</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Network:</span>
-                  <span className="text-blue-300">Arbitrum One</span>
+                  <span className="text-blue-300">Arbitrum Sepolia</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Payment Method:</span>
                   <span className="text-purple-300">Privy Embedded Wallet</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">User:</span>
-                  <span className="text-white">{getUserDisplayName()}</span>
+                  <span className="text-gray-400">Your Balance:</span>
+                  <span className="text-white">{usdcBalance} USDC</span>
                 </div>
               </div>
             </div>
@@ -430,7 +434,7 @@ export default function PostPage() {
                 onClick={() => {
                   // Save as draft functionality
                   localStorage.setItem('investigation_draft', JSON.stringify({
-                    title, content, tags, evidence, rewardPool, files: uploadedFiles
+                    title, content, tags, evidence, files: uploadedFiles
                   }))
                   alert('Draft saved locally!')
                 }}
@@ -440,13 +444,17 @@ export default function PostPage() {
               <Button 
                 type="submit" 
                 className="flex-1 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/20"
-                disabled={isSubmitting || !connected}
+                disabled={isSubmitting || !connected || hasInsufficientBalance}
               >
                 {connected ? (
-                  <>
-                    <Shield className="w-4 h-4 mr-2" />
-                    Submit & Pay with Privy
-                  </>
+                  hasInsufficientBalance ? (
+                    'Insufficient USDC'
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Pay 1 USDC & Post
+                    </>
+                  )
                 ) : (
                   'Connect Privy First'
                 )}
@@ -459,7 +467,6 @@ export default function PostPage() {
         <PrivyPaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
-          rewardPool={rewardPool}
           postData={{
             title,
             content,
