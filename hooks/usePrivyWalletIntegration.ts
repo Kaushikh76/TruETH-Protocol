@@ -3,13 +3,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { ethers } from 'ethers'
 
-interface PaymentConfirmation {
-  success: boolean
-  transactionHash: string
-  postId?: string
-  error?: string
-}
-
 export function usePrivyWalletIntegration() {
   const { 
     ready, 
@@ -24,8 +17,6 @@ export function usePrivyWalletIntegration() {
   
   const [ethBalance, setEthBalance] = useState<string>('0')
   const [usdcBalance, setUsdcBalance] = useState<string>('0')
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
-  const [paymentStatus, setPaymentStatus] = useState<string>('')
 
   // Get the primary wallet (embedded or external)
   const primaryWallet = wallets.find(wallet => 
@@ -97,136 +88,6 @@ export function usePrivyWalletIntegration() {
     }
   }, [primaryWallet])
 
-  // Process payment for posting (1 USDC payment on Arbitrum Sepolia)
-  const processPayment = useCallback(async (
-    postData: any
-  ): Promise<PaymentConfirmation> => {
-    if (!primaryWallet || !authenticated) {
-      throw new Error('Wallet not connected')
-    }
-
-    if (!isArbitrumSepolia) {
-      await switchToArbitrumSepolia()
-      // Wait for chain switch to complete
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-
-    setIsProcessingPayment(true)
-    setPaymentStatus('Initiating payment...')
-
-    try {
-      // USDC contract address on Arbitrum Sepolia (testnet)
-      const USDC_CONTRACT = '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d'
-      // Use a proper Ethereum address format that you control
-      // You can bridge from this address to Sui later using Sui Bridge or other cross-chain bridges
-      const COLLECTION_WALLET = '0x742d35cc6634c0532925a3b8d45d9652b395e906'
-      
-      // Convert 1 USDC to proper decimals (USDC has 6 decimals)
-      const usdcAmount = ethers.parseUnits('1', 6) // Fixed 1 USDC per post
-
-      setPaymentStatus('Requesting transaction approval...')
-
-      // Create ERC-20 transfer transaction data
-      const transferInterface = new ethers.Interface([
-        'function transfer(address to, uint256 amount) returns (bool)'
-      ])
-      
-      const transferData = transferInterface.encodeFunctionData('transfer', [
-        COLLECTION_WALLET,
-        usdcAmount
-      ])
-
-      // Send transaction using the wallet provider directly
-      const provider = await primaryWallet.getEthereumProvider()
-      const ethersProvider = new ethers.BrowserProvider(provider)
-      const signer = await ethersProvider.getSigner()
-
-      // Create the transaction object
-      const transaction = {
-        to: USDC_CONTRACT,
-        data: transferData,
-        value: '0x0', // No ETH value for ERC-20 transfer
-      }
-
-      // Send transaction using ethers signer
-      const txResult = await signer.sendTransaction(transaction)
-
-      setPaymentStatus('Transaction sent. Confirming payment...')
-
-      // Send transaction details to backend for confirmation
-      const response = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...postData,
-          paymentTx: {
-            hash: txResult.transactionHash,
-            amount: 1, // Fixed 1 USDC
-            from: primaryWallet.address,
-            to: COLLECTION_WALLET,
-            timestamp: Date.now(),
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to submit post')
-      }
-
-      const result = await response.json()
-      
-      setPaymentStatus('Payment confirmed! USDC will be bridged to Sui.')
-      
-      // Refresh balances after successful payment
-      setTimeout(() => {
-        if (primaryWallet?.address) {
-          getBalances(primaryWallet.address)
-        }
-      }, 2000)
-      
-      return {
-        success: true,
-        transactionHash: txResult.hash,
-        postId: result.data?.postId,
-      }
-
-    } catch (error: any) {
-      console.error('Payment failed:', error)
-      setPaymentStatus('Payment failed')
-      return {
-        success: false,
-        transactionHash: '',
-        error: error.message,
-      }
-    } finally {
-      setIsProcessingPayment(false)
-      setTimeout(() => setPaymentStatus(''), 3000)
-    }
-  }, [primaryWallet, authenticated, isArbitrumSepolia, switchToArbitrumSepolia, getBalances])
-
-  // Bridge to Sui functionality (simplified)
-  const bridgeToSui = useCallback(async (amount: number) => {
-    if (!primaryWallet || !authenticated) {
-      throw new Error('Wallet not connected')
-    }
-
-    try {
-      setPaymentStatus('Opening Sui Bridge...')
-      
-      // Open Sui Bridge in new window
-      const bridgeUrl = `https://bridge.sui.io/?from=arbitrum&to=sui&token=ETH&amount=${amount}`
-      window.open(bridgeUrl, '_blank', 'width=800,height=600')
-      
-      setPaymentStatus('Bridge window opened. Complete the bridge transaction.')
-      
-    } catch (error: any) {
-      console.error('Bridge failed:', error)
-      setPaymentStatus('Bridge failed')
-    }
-  }, [primaryWallet, authenticated])
-
   // Sign message functionality
   const signMessage = useCallback(async (message: string) => {
     if (!primaryWallet || !authenticated) {
@@ -278,12 +139,7 @@ export function usePrivyWalletIntegration() {
     connectWallet,
     logout,
     switchToArbitrumSepolia,
-    processPayment,
-    bridgeToSui,
     signMessage,
-    
-    // Payment state
-    isProcessingPayment,
-    paymentStatus,
+    getBalances,
   }
 }
