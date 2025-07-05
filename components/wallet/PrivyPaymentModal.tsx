@@ -147,10 +147,10 @@ export function PrivyPaymentModal({
 
   const storeOnWalrus = async (investigationData: any) => {
   try {
-    // Use the Walrus server URL (port 3000)
+    // Use the Walrus server URL (port 3000) - FIXED: Use correct endpoint
     const serverUrl = process.env.NEXT_PUBLIC_WALRUS_SERVER_URL || 'http://localhost:3000'
     
-    const response = await fetch(`${serverUrl}/api/walrus/store`, {
+    const response = await fetch(`${serverUrl}/api/investigations/store`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,6 +291,14 @@ export function PrivyPaymentModal({
               <span className="text-white font-semibold">1.00 USDC</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-400">Source Chain:</span>
+              <span className="text-white text-sm">Arbitrum Sepolia</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Destination Chain:</span>
+              <span className="text-white text-sm">Sui Testnet</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400">Bridge:</span>
               <Badge className="bg-orange-500/20 text-orange-300 border-orange-400/30">
                 Wormhole CCTP
@@ -339,6 +347,45 @@ export function PrivyPaymentModal({
           </div>
         )}
 
+        {/* Bridge Results - Show immediately after bridge completes */}
+        {txResults && currentStep !== 'payment' && (
+          <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-lg">
+            <h4 className="text-emerald-300 font-semibold mb-3 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Bridge Transaction Complete!
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Bridge TX:</span>
+                <button
+                  onClick={() => copyToClipboard(txResults.txHash)}
+                  className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1 font-mono"
+                >
+                  {txResults.txHash?.slice(0, 10)}...
+                  <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              {txResults.wormholeSequence && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">Wormhole TX Hash:</span>
+                  <button
+                    onClick={() => copyToClipboard(txResults.wormholeSequence)}
+                    className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1 font-mono"
+                  >
+                    {txResults.wormholeSequence?.slice(0, 10)}...
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+              <div className="mt-2 p-2 bg-emerald-500/10 rounded border border-emerald-400/20">
+                <p className="text-emerald-400 text-xs">
+                  ✅ USDC successfully bridged from Arbitrum Sepolia to Sui Testnet via Wormhole!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Results */}
         {currentStep === 'complete' && walrusResults && (
           <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-lg">
@@ -361,18 +408,6 @@ export function PrivyPaymentModal({
                   <Copy className="w-3 h-3" />
                 </button>
               </div>
-              {txResults && (
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">Bridge TX:</span>
-                  <button
-                    onClick={() => copyToClipboard(txResults.txHash)}
-                    className="text-emerald-300 hover:text-emerald-200 flex items-center gap-1 font-mono"
-                  >
-                    {txResults.txHash?.slice(0, 10)}...
-                    <Copy className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
               <div className="mt-3 p-2 bg-emerald-500/10 rounded border border-emerald-400/20">
                 <p className="text-emerald-400 text-xs">
                   ✅ Your investigation is now permanently stored on Walrus and accessible via decentralized networks!

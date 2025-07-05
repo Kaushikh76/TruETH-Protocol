@@ -25,23 +25,33 @@ import {
   X
 } from "lucide-react"
 
-// Entity interfaces
+// Updated interface to match backend structure
 interface ExtractedEntities {
-  day?: string;
-  date?: string;
-  time?: string;
-  location?: string;
-  walletAddresses: string[];
-  suspectAddresses: string[];
-  eventType: string;
-  amount?: string;
-  currency?: string;
-  platform?: string;
-  urls?: string[];
+  investigationType: 'Financial' | 'Social' | 'Technical' | 'Legal' | 'Environmental' | 'Corporate' | 'Political';
+  severityLevel: 'Low' | 'Medium' | 'High' | 'Critical';
+  geographicScope: 'Local' | 'Regional' | 'National' | 'International';
+  involvedEntities: {
+    people: string[];
+    organizations: string[];
+    locations: string[];
+    platforms: string[];
+    walletAddresses: string[];
+    websites: string[];
+  };
+  timeframe: {
+    startDate?: string;
+    endDate?: string;
+    duration?: string;
+  };
+  financialImpact?: {
+    amount?: string;
+    currency?: string;
+    affectedUsers?: number;
+  };
   content: string;
 }
 
-// Entity Preview Modal Component (inline for completeness)
+// Entity Preview Modal Component (updated for new structure)
 function EntityPreviewModal({ 
   isOpen, 
   onClose, 
@@ -81,127 +91,171 @@ function EntityPreviewModal({
             </div>
           ) : entities ? (
             <div className="space-y-6">
-              {/* Event Classification */}
+              {/* Investigation Classification */}
               <div className="p-4 bg-purple-500/10 border border-purple-400/20 rounded-lg">
                 <h3 className="text-purple-300 font-semibold mb-2 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Event Classification
+                  Investigation Classification
                 </h3>
-                <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30 text-base px-3 py-1">
-                  {entities.eventType}
-                </Badge>
+                <div className="flex gap-2 flex-wrap">
+                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30 text-base px-3 py-1">
+                    {entities.investigationType}
+                  </Badge>
+                  <Badge className="bg-amber-500/20 text-amber-300 border-amber-400/30">
+                    {entities.severityLevel} Severity
+                  </Badge>
+                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
+                    {entities.geographicScope} Scope
+                  </Badge>
+                </div>
               </div>
 
-              {/* Time & Location */}
-              {(entities.date || entities.day || entities.time || entities.location) && (
+              {/* Time & Financial Impact */}
+              {(entities.timeframe?.startDate || entities.timeframe?.endDate || entities.timeframe?.duration || entities.financialImpact) && (
                 <div className="p-4 bg-blue-500/10 border border-blue-400/20 rounded-lg">
                   <h3 className="text-blue-300 font-semibold mb-3 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
-                    Time & Location
+                    Timeline & Financial Impact
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {entities.day && (
+                    {entities.timeframe?.startDate && (
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-sm">Day:</span>
-                        <span className="text-white text-sm">{entities.day}</span>
+                        <span className="text-gray-400 text-sm">Start:</span>
+                        <span className="text-white text-sm">{entities.timeframe.startDate}</span>
                       </div>
                     )}
-                    {entities.date && (
+                    {entities.timeframe?.endDate && (
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-sm">Date:</span>
-                        <span className="text-white text-sm">{entities.date}</span>
+                        <span className="text-gray-400 text-sm">End:</span>
+                        <span className="text-white text-sm">{entities.timeframe.endDate}</span>
                       </div>
                     )}
-                    {entities.time && (
+                    {entities.timeframe?.duration && (
                       <div className="flex items-center gap-2">
                         <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-white text-sm">{entities.time}</span>
+                        <span className="text-white text-sm">{entities.timeframe.duration}</span>
                       </div>
                     )}
-                    {entities.location && (
+                    {entities.financialImpact?.amount && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        <span className="text-white text-sm">{entities.location}</span>
+                        <DollarSign className="w-3 h-3 text-gray-400" />
+                        <span className="text-white text-sm">{entities.financialImpact.amount} {entities.financialImpact.currency || ''}</span>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Financial Details */}
-              {(entities.amount || entities.currency) && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-lg">
-                  <h3 className="text-emerald-300 font-semibold mb-3 flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" />
-                    Financial Details
-                  </h3>
-                  <div className="flex items-center gap-4">
-                    {entities.amount && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-sm">Amount:</span>
-                        <span className="text-white text-sm font-medium">{entities.amount}</span>
-                      </div>
-                    )}
-                    {entities.currency && (
-                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30">
-                        {entities.currency}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Wallet Addresses */}
-              {entities.walletAddresses.length > 0 && (
-                <div className="p-4 bg-orange-500/10 border border-orange-400/20 rounded-lg">
-                  <h3 className="text-orange-300 font-semibold mb-3 flex items-center gap-2">
-                    <Wallet className="w-4 h-4" />
-                    Wallet Addresses ({entities.walletAddresses.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {entities.walletAddresses.map((address, index) => (
-                      <div key={index} className="flex items-center gap-3 p-2 bg-black/30 rounded">
-                        <span className="text-orange-400 font-mono text-sm">
-                          {address.slice(0, 6)}...{address.slice(-4)}
-                        </span>
-                        {entities.suspectAddresses.includes(address) && (
-                          <Badge className="bg-red-500/20 text-red-300 border-red-400/30 text-xs">
-                            Suspect
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Platform & URLs */}
-              {(entities.platform || (entities.urls && entities.urls.length > 0)) && (
-                <div className="p-4 bg-gray-500/10 border border-gray-400/20 rounded-lg">
-                  <h3 className="text-gray-300 font-semibold mb-3 flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Platform & Links
-                  </h3>
-                  <div className="space-y-2">
-                    {entities.platform && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-sm">Platform:</span>
-                        <Badge className="bg-gray-500/20 text-gray-300 border-gray-400/30">
-                          {entities.platform}
-                        </Badge>
-                      </div>
-                    )}
-                    {entities.urls && entities.urls.length > 0 && (
-                      <div className="space-y-1">
-                        <span className="text-gray-400 text-sm">URLs found:</span>
-                        {entities.urls.map((url, index) => (
-                          <div key={index} className="text-blue-400 text-sm font-mono break-all">
-                            {url}
+              {/* Involved Entities */}
+              {entities.involvedEntities && (
+                <div className="space-y-4">
+                  {/* Wallet Addresses */}
+                  {entities.involvedEntities.walletAddresses && entities.involvedEntities.walletAddresses.length > 0 && (
+                    <div className="p-4 bg-orange-500/10 border border-orange-400/20 rounded-lg">
+                      <h3 className="text-orange-300 font-semibold mb-3 flex items-center gap-2">
+                        <Wallet className="w-4 h-4" />
+                        Wallet Addresses ({entities.involvedEntities.walletAddresses.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {entities.involvedEntities.walletAddresses.map((address, index) => (
+                          <div key={index} className="flex items-center gap-3 p-2 bg-black/30 rounded">
+                            <span className="text-orange-400 font-mono text-sm">
+                              {address.slice(0, 6)}...{address.slice(-4)}
+                            </span>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Organizations */}
+                  {entities.involvedEntities.organizations && entities.involvedEntities.organizations.length > 0 && (
+                    <div className="p-4 bg-slate-500/10 border border-slate-400/20 rounded-lg">
+                      <h3 className="text-slate-300 font-semibold mb-3 flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        Organizations ({entities.involvedEntities.organizations.length})
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {entities.involvedEntities.organizations.map((org, index) => (
+                          <Badge key={index} className="bg-slate-500/20 text-slate-300 border-slate-400/30">
+                            {org}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Platforms & Websites */}
+                  {((entities.involvedEntities.platforms && entities.involvedEntities.platforms.length > 0) || 
+                    (entities.involvedEntities.websites && entities.involvedEntities.websites.length > 0)) && (
+                    <div className="p-4 bg-gray-500/10 border border-gray-400/20 rounded-lg">
+                      <h3 className="text-gray-300 font-semibold mb-3 flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        Platforms & Links
+                      </h3>
+                      <div className="space-y-2">
+                        {entities.involvedEntities.platforms && entities.involvedEntities.platforms.length > 0 && (
+                          <div>
+                            <span className="text-gray-400 text-sm">Platforms:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {entities.involvedEntities.platforms.map((platform, index) => (
+                                <Badge key={index} className="bg-gray-500/20 text-gray-300 border-gray-400/30">
+                                  {platform}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {entities.involvedEntities.websites && entities.involvedEntities.websites.length > 0 && (
+                          <div>
+                            <span className="text-gray-400 text-sm">URLs found:</span>
+                            {entities.involvedEntities.websites.map((url, index) => (
+                              <div key={index} className="text-blue-400 text-sm font-mono break-all">
+                                {url}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* People & Locations */}
+                  {((entities.involvedEntities.people && entities.involvedEntities.people.length > 0) || 
+                    (entities.involvedEntities.locations && entities.involvedEntities.locations.length > 0)) && (
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-400/20 rounded-lg">
+                      <h3 className="text-emerald-300 font-semibold mb-3 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        People & Locations
+                      </h3>
+                      <div className="space-y-2">
+                        {entities.involvedEntities.people && entities.involvedEntities.people.length > 0 && (
+                          <div>
+                            <span className="text-gray-400 text-sm">People:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {entities.involvedEntities.people.map((person, index) => (
+                                <Badge key={index} className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30">
+                                  {person}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {entities.involvedEntities.locations && entities.involvedEntities.locations.length > 0 && (
+                          <div>
+                            <span className="text-gray-400 text-sm">Locations:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {entities.involvedEntities.locations.map((location, index) => (
+                                <Badge key={index} className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30">
+                                  {location}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -209,11 +263,12 @@ function EntityPreviewModal({
               <div className="p-4 bg-gray-900/50 border border-white/10 rounded-lg">
                 <h3 className="text-white font-semibold mb-2">AI Analysis Summary</h3>
                 <p className="text-gray-300 text-sm leading-relaxed">
-                  Found {entities.walletAddresses.length} wallet address{entities.walletAddresses.length !== 1 ? 'es' : ''}, 
-                  {entities.suspectAddresses.length > 0 && ` ${entities.suspectAddresses.length} marked as suspect${entities.suspectAddresses.length !== 1 ? 's' : ''}, `}
-                  categorized as "{entities.eventType}".
-                  {entities.date && ` Occurred on ${entities.date}.`}
-                  {entities.platform && ` Platform: ${entities.platform}.`}
+                  Classified as {entities.investigationType} investigation with {entities.severityLevel.toLowerCase()} severity and {entities.geographicScope.toLowerCase()} scope.
+                  {entities.involvedEntities.walletAddresses && entities.involvedEntities.walletAddresses.length > 0 && 
+                    ` Found ${entities.involvedEntities.walletAddresses.length} wallet address${entities.involvedEntities.walletAddresses.length !== 1 ? 'es' : ''}.`}
+                  {entities.involvedEntities.organizations && entities.involvedEntities.organizations.length > 0 &&
+                    ` Involves ${entities.involvedEntities.organizations.length} organization${entities.involvedEntities.organizations.length !== 1 ? 's' : ''}.`}
+                  {entities.financialImpact?.amount && ` Financial impact: ${entities.financialImpact.amount} ${entities.financialImpact.currency || ''}.`}
                 </p>
               </div>
 
@@ -344,7 +399,6 @@ export default function PostPage() {
   }
 }
 
-
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -375,16 +429,15 @@ export default function PostPage() {
       ...evidenceItems.filter(item => item.trim())
     ]
 
-    // FIXED: Create proper data structure
+    // Create proper data structure
     const postData = {
       title: formData.title,
       content: formData.content,
       tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
       evidence: allEvidence,
       files: [],
-      userWallet: account,  // Keep this for backwards compatibility
+      userWallet: account,
       userId: user?.id || 'anonymous',
-      // Add the proper author structure that the server expects
       author: {
         wallet: account,
         userId: user?.id || 'anonymous'
@@ -409,7 +462,6 @@ export default function PostPage() {
     setIsSubmitting(false)
   }
 }
-
 
   // Handle successful payment
   const handlePaymentSuccess = (result: any) => {
