@@ -63,91 +63,119 @@ export function PrivyPaymentModal({
   if (!isOpen) return null
 
   const handlePaymentAndBridge = async () => {
-    if (!primaryWallet || !connected) {
-      alert('Please connect your wallet first')
-      return
-    }
-
-    setIsProcessing(true)
-    setCurrentStep('payment')
-
-    try {
-      // Get ethers signer from Privy wallet
-      const provider = await primaryWallet.getEthereumProvider()
-      const ethersProvider = new ethers.BrowserProvider(provider)
-      const signer = await ethersProvider.getSigner()
-
-      // Step 1: Bridge USDC to Sui via Wormhole (using permanent address)
-      setCurrentStep('bridge')
-      
-      const bridgeResult = await bridgeUSDCToSui('1.0', signer, PERMANENT_SUI_ADDRESS)
-
-      if (!bridgeResult.success) {
-        throw new Error(bridgeResult.error || 'Bridge failed')
-      }
-
-      setTxResults(bridgeResult)
-
-      // Step 2: Store investigation data on Walrus
-      setCurrentStep('storage')
-      
-      const walrusResult = await storeOnWalrus({
-        ...postData,
-        bridgeTx: {
-          hash: bridgeResult.txHash,
-          amount: 1,
-          from: account,
-          suiRecipient: PERMANENT_SUI_ADDRESS,
-          wormholeSequence: bridgeResult.wormholeSequence,
-          timestamp: Date.now(),
-        },
-      })
-
-      if (!walrusResult.success) {
-        throw new Error('Failed to store data on Walrus')
-      }
-
-      setWalrusResults(walrusResult.data)
-      setCurrentStep('complete')
-
-      onSuccess({
-        success: true,
-        transactionHash: bridgeResult.txHash,
-        postId: walrusResult.data?.postId,
-        blobId: walrusResult.data?.blobId,
-        bridgeDetails: bridgeResult,
-        walrusDetails: walrusResult.data
-      })
-
-    } catch (error: any) {
-      console.error('Payment and bridge failed:', error)
-      alert(`Transaction failed: ${error.message}`)
-    } finally {
-      setIsProcessing(false)
-    }
+  if (!primaryWallet || !connected) {
+    alert('Please connect your wallet first')
+    return
   }
+
+  setIsProcessing(true)
+  setCurrentStep('payment')
+
+  try {
+    // Get ethers signer from Privy wallet
+    const provider = await primaryWallet.getEthereumProvider()
+    const ethersProvider = new ethers.BrowserProvider(provider)
+    const signer = await ethersProvider.getSigner()
+
+    // Step 1: Bridge USDC to Sui via Wormhole (using permanent address)
+    setCurrentStep('bridge')
+    
+    const bridgeResult = await bridgeUSDCToSui('1.0', signer, PERMANENT_SUI_ADDRESS)
+
+    if (!bridgeResult.success) {
+      throw new Error(bridgeResult.error || 'Bridge failed')
+    }
+
+    setTxResults(bridgeResult)
+
+    // Step 2: Store investigation data on Walrus
+    setCurrentStep('storage')
+    
+    // FIXED: Create proper data structure that matches server expectations
+    const investigationData = {
+      title: postData.title,
+      content: postData.content,
+      tags: postData.tags || [],
+      evidence: postData.evidence || [],
+      files: postData.files || [],
+      author: {
+        wallet: account,  // This was missing!
+        userId: postData.userId || user?.id || 'anonymous'
+      },
+      bridgeTransaction: {
+        hash: bridgeResult.txHash,
+        amount: 1,
+        from: account,
+        suiRecipient: PERMANENT_SUI_ADDRESS,
+        wormholeSequence: bridgeResult.wormholeSequence,
+        timestamp: Date.now(),
+      },
+      metadata: {
+        createdAt: new Date().toISOString(),
+        version: '1.0.0',
+        protocol: 'TruETH',
+        contentType: 'investigation'
+      }
+    }
+
+    const walrusResult = await storeOnWalrus(investigationData)
+
+    if (!walrusResult.success) {
+      throw new Error('Failed to store data on Walrus')
+    }
+
+    setWalrusResults(walrusResult.data)
+    setCurrentStep('complete')
+
+    onSuccess({
+      success: true,
+      transactionHash: bridgeResult.txHash,
+      postId: walrusResult.data?.postId,
+      blobId: walrusResult.data?.blobId,
+      bridgeDetails: bridgeResult,
+      walrusDetails: walrusResult.data
+    })
+
+  } catch (error: any) {
+    console.error('Payment and bridge failed:', error)
+    alert(`Transaction failed: ${error.message}`)
+  } finally {
+    setIsProcessing(false)
+  }
+}
+
 
   const storeOnWalrus = async (investigationData: any) => {
-    try {
-      const response = await fetch('/api/walrus/store', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(investigationData),
-      })
+  try {
+    // Use the Walrus server URL (port 3000)
+    const serverUrl = process.env.NEXT_PUBLIC_WALRUS_SERVER_URL || 'http://localhost:3000'
+    
+    const response = await fetch(`${serverUrl}/api/walrus/store`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': process.env.NEXT_PUBLIC_WALRUS_API_KEY || 'dev-key-123'
+      },
+      body: JSON.stringify(investigationData)
+    })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to store on Walrus')
-      }
+    if (!response.ok) {
+      const errorData = await response.text()
+      throw new Error(`Walrus server error: ${response.status} - ${errorData}`)
+    }
 
-      return await response.json()
-    } catch (error) {
-      console.error('Walrus storage error:', error)
-      throw error
+    const result = await response.json()
+    return result
+
+  } catch (error) {
+    console.error('Failed to store on Walrus:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown Walrus storage error'
     }
   }
+}
+
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
