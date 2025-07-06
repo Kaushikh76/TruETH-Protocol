@@ -4,7 +4,7 @@
 import { useState } from "react"
 import { InvestigationCard } from "../components/investigation-card"
 import { KnowledgeGraph } from "../components/knowledge-graph"
-import { useWalrusInvestigations } from "../hooks/useWalrusData"
+import { useWalrusInvestigations } from "../hooks/useWalrusBlobs"
 import { usePrivyWalletIntegration } from "../hooks/usePrivyWalletIntegration"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Database,
-  Globe
+  Globe,
+  Plus
 } from "lucide-react"
 
 export default function FeedPage() {
@@ -38,7 +39,8 @@ export default function FeedPage() {
     loading, 
     error, 
     refetch, 
-    vote 
+    vote,
+    addKnownBlobId 
   } = useWalrusInvestigations(walrusFilters)
 
   const handleVote = async (investigationId: string, voteType: "correct" | "false" | "maybe") => {
@@ -68,6 +70,16 @@ export default function FeedPage() {
     setSeverityLevel("")
   }
 
+  const handleAddBlobId = () => {
+    const blobId = prompt('Enter a Walrus blob ID to add:')
+    if (blobId?.trim()) {
+      addKnownBlobId(blobId.trim(), {
+        createdAt: new Date().toISOString(),
+        author: 'manual-add'
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
@@ -77,9 +89,18 @@ export default function FeedPage() {
             <h1 className="text-3xl font-bold text-white mb-1 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               TruETH Protocol
             </h1>
-            <p className="text-gray-400 text-sm">Discover and verify investigations stored on Walrus</p>
+            <p className="text-gray-400 text-sm">Discover and verify investigations stored directly on Walrus</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              onClick={handleAddBlobId}
+              variant="outline"
+              size="sm"
+              className="border-white/20 text-gray-300 hover:text-white hover:border-white/30"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Blob
+            </Button>
             <Button
               onClick={handleRefresh}
               variant="outline"
@@ -101,12 +122,12 @@ export default function FeedPage() {
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-purple-400" />
             <span className="text-gray-400">
-              {loading ? 'Loading...' : `${investigations.length} investigations`}
+              {loading ? 'Loading...' : `${investigations.length} investigations from Walrus blobs`}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-blue-400" />
-            <span className="text-gray-400">Walrus + GRC-20</span>
+            <span className="text-gray-400">Direct Blob Access</span>
           </div>
         </div>
       </div>

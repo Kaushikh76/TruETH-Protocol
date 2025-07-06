@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { InvestigationCard } from "../../components/investigation-card"
-import { useWalrusSearch } from "../../hooks/useWalrusData"
+import { useWalrusSearch } from "../../hooks/useWalrusBlobs"
 import { usePrivyWalletIntegration } from "../../hooks/usePrivyWalletIntegration"
 import { EnhancedInvestigation } from "../../types/enhanced-investigation"
 import { Search, Filter, X, Loader2, Database, Globe } from "lucide-react"
@@ -89,10 +89,10 @@ export default function SearchPage() {
             Search Investigations
           </h1>
           <div className="flex items-center gap-4 text-sm">
-            <p className="text-gray-400">Find investigations by keywords, tags, or properties</p>
+            <p className="text-gray-400">Find investigations by searching Walrus blobs directly</p>
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-purple-400" />
-              <span className="text-gray-400">Walrus + GRC-20</span>
+              <span className="text-gray-400">Direct Blob Search</span>
             </div>
           </div>
         </div>

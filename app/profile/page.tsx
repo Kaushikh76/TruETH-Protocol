@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { InvestigationCard } from "../../components/investigation-card"
-import { useWalrusUserData } from "../../hooks/useWalrusData"
+import { useWalrusUserData } from "../../hooks/useWalrusBlobs"
 import { usePrivyWalletIntegration } from "../../hooks/usePrivyWalletIntegration"
 import { 
   User, 

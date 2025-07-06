@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { InvestigationCard } from "../../../components/investigation-card"
-import { useWalrusInvestigation } from "../../../hooks/useWalrusData"
+import { useWalrusInvestigation } from "../../../hooks/useWalrusBlobs"
 import { usePrivyWalletIntegration } from "../../../hooks/usePrivyWalletIntegration"
 import { 
   ArrowLeft, 
@@ -32,7 +32,7 @@ export default function InvestigationPage() {
   const investigationId = params.id as string
 
   const { account } = usePrivyWalletIntegration()
-  const { investigation, loading, error, votes, votesLoading, vote } = useWalrusInvestigation(investigationId)
+  const { investigation, loading, error, vote } = useWalrusInvestigation(investigationId)
 
   const [newReply, setNewReply] = useState("")
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
@@ -59,10 +59,9 @@ export default function InvestigationPage() {
 
     setIsSubmittingReply(true)
     try {
-      // TODO: Implement reply submission to Walrus
-      // For now, just clear the reply
+      // TODO: Implement reply submission to Walrus as a separate blob
       setNewReply("")
-      alert('Reply functionality coming soon!')
+      alert('Reply functionality - store as separate Walrus blob coming soon!')
     } catch (error) {
       console.error('Failed to submit reply:', error)
       alert('Failed to submit reply')
@@ -75,9 +74,9 @@ export default function InvestigationPage() {
     navigator.clipboard.writeText(text)
   }
 
-  const openInExplorer = (hash: string) => {
-    // TODO: Add proper explorer URLs based on the hash type
-    window.open(`https://explorer.walrus.site/object/${hash}`, '_blank')
+  const openWalrusExplorer = (blobId: string) => {
+    // Open in Walrus explorer - adjust URL as needed
+    window.open(`https://blobscan.com/blob/${blobId}`, '_blank')
   }
 
   if (loading) {
@@ -86,7 +85,7 @@ export default function InvestigationPage() {
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-4" />
           <h1 className="text-xl font-bold text-white mb-2">Loading Investigation</h1>
-          <p className="text-gray-400">Fetching data from Walrus...</p>
+          <p className="text-gray-400">Fetching blob directly from Walrus...</p>
         </div>
       </div>
     )
@@ -98,7 +97,9 @@ export default function InvestigationPage() {
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-4">Investigation Not Found</h1>
-          <p className="text-gray-400 mb-6">{error || 'This investigation could not be found on Walrus'}</p>
+          <p className="text-gray-400 mb-6">
+            {error || 'This investigation blob could not be found on Walrus'}
+          </p>
           <div className="flex gap-3 justify-center">
             <Button 
               onClick={() => router.back()} 
